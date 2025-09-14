@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tik Tak Toe Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-purple-700 via-pink-600 to-red-500 flex items-center justify-center min-h-screen font-sans">
+
+  <!-- Start Screen -->
+  <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20">
+    <h1 class="text-4xl md:text-5xl font-bold text-white drop-shadow-lg mb-6 animate-bounce">Tic Tac Toe</h1>
+    <button onclick="showModeScreen()" class="px-8 py-3 bg-gradient-to-r from-green-400 to-blue-500 text-white text-xl font-semibold rounded-2xl shadow-lg transform transition hover:scale-110 active:scale-95">
+      ▶ Play Game
+    </button>
+  </div>
+
+  <!-- Mode Selection -->
+  <div id="modeScreen" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20 space-y-6">
+    <h2 class="text-3xl font-bold text-white mb-4">Choose Mode</h2>
+    <button onclick="startGame('single')" class="px-8 py-3 bg-gradient-to-r from-pink-400 to-red-500 text-white text-lg rounded-2xl shadow hover:scale-105 transition">🤖 1 Player (vs AI)</button>
+    <button onclick="startGame('multi')" class="px-8 py-3 bg-gradient-to-r from-blue-400 to-purple-500 text-white text-lg rounded-2xl shadow hover:scale-105 transition">👥 2 Players</button>
+  </div>
+
+  <!-- Game Container -->
+  <div id="gameContainer" class="hidden flex flex-col items-center justify-center space-y-6">
+    <h2 id="turnText" class="text-2xl font-bold text-white drop-shadow-md">Player X's Turn</h2>
+
+    <!-- Board -->
+    <div class="grid grid-cols-3 gap-3">
+      <div class="cell" onclick="makeMove(this)"></div>
+      <div class="cell" onclick="makeMove(this)"></div>
+      <div class="cell" onclick="makeMove(this)"></div>
+      <div class="cell" onclick="makeMove(this)"></div>
+      <div class="cell" onclick="makeMove(this)"></div>
+      <div class="cell" onclick="makeMove(this)"></div>
+      <div class="cell" onclick="makeMove(this)"></div>
+      <div class="cell" onclick="makeMove(this)"></div>
+      <div class="cell" onclick="makeMove(this)"></div>
+    </div>
+  </div>
+
+  <!-- Winner Popup -->
+  <div id="winnerPopup" class="hidden fixed inset-0 flex items-center justify-center bg-black/70 z-30">
+    <div class="bg-white rounded-2xl p-8 text-center shadow-xl transform scale-95 animate-in fade-in zoom-in">
+      <h2 id="winnerText" class="text-2xl font-bold mb-6">Player X Wins!</h2>
+      <button onclick="restartGame()" class="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold shadow hover:scale-105 transition">🔄 Restart</button>
+    </div>
+  </div>
+
+  <!-- Sounds -->
+  <audio id="clickSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+  <audio id="winSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+
+  <style>
+    .cell {
+      width: 6rem; height: 6rem;
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      border-radius: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: bold; color: white;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .cell:hover { background: rgba(255,255,255,0.3); transform: scale(1.05); }
+  </style>
+
+  <script>
+    let currentPlayer = "X";
+    let gameActive = true;
+    let gameMode = "multi"; // default
+    let aiPlayer = "O";
+
+    function showModeScreen() {
+      document.getElementById("startScreen").classList.add("hidden");
+      document.getElementById("modeScreen").classList.remove("hidden");
+    }
+
+    function startGame(mode) {
+      gameMode = mode;
+      document.getElementById("modeScreen").classList.add("hidden");
+      document.getElementById("gameContainer").classList.remove("hidden");
+      resetBoard();
+    }
+
+    function makeMove(cell) {
+      const clickSound = document.getElementById("clickSound");
+      if (!gameActive || cell.textContent !== "") return;
+
+      cell.textContent = currentPlayer;
+      clickSound.play();
+
+      if (checkWinner()) {
+        gameOver(`🎉 Player ${currentPlayer} Wins!`);
+        return;
+      }
+
+      if (isDraw()) {
+        gameOver("🤝 It's a Draw!");
+        return;
+      }
+
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+      document.getElementById("turnText").textContent = `Player ${currentPlayer}'s Turn`;
+
+      // AI turn
+      if (gameMode === "single" && currentPlayer === aiPlayer && gameActive) {
+        setTimeout(aiMove, 600);
+      }
+    }
+
+    function aiMove() {
+      let cells = [...document.querySelectorAll(".cell")];
+      let emptyCells = cells.filter(c => c.textContent === "");
+      if (emptyCells.length === 0) return;
+
+      // Try to win
+      let move = findBestMove(aiPlayer);
+      // Try to block
+      if (!move) move = findBestMove("X");
+      // Take center
+      if (!move && cells[4].textContent === "") move = cells[4];
+      // Take random corner
+      if (!move) {
+        let corners = [cells[0], cells[2], cells[6], cells[8]].filter(c => c.textContent === "");
+        if (corners.length) move = corners[Math.floor(Math.random() * corners.length)];
+      }
+      // Fallback random
+      if (!move) move = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+
+      makeMove(move);
+    }
+
+    function findBestMove(player) {
+      const cells = [...document.querySelectorAll(".cell")];
+      const wins = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+      for (let combo of wins) {
+        let [a,b,c] = combo;
+        let values = [cells[a].textContent, cells[b].textContent, cells[c].textContent];
+        if (values.filter(v => v === player).length === 2 && values.includes("")) {
+          return cells[combo[values.indexOf("")]];
+        }
+      }
+      return null;
+    }
+
+    function checkWinner() {
+      const cells = [...document.querySelectorAll(".cell")].map(c => c.textContent);
+      const wins = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+      return wins.some(pattern =>
+        cells[pattern[0]] &&
+        cells[pattern[0]] === cells[pattern[1]] &&
+        cells[pattern[1]] === cells[pattern[2]]
+      );
+    }
+
+    function isDraw() {
+      return [...document.querySelectorAll(".cell")].every(c => c.textContent !== "");
+    }
+
+    function gameOver(message) {
+      gameActive = false;
+      document.getElementById("winnerText").textContent = message;
+      document.getElementById("winnerPopup").classList.remove("hidden");
+      document.getElementById("winSound").play();
+    }
+
+    function restartGame() {
+      resetBoard();
+      currentPlayer = "X";
+      gameActive = true;
+      document.getElementById("turnText").textContent = "Player X's Turn";
+      document.getElementById("winnerPopup").classList.add("hidden");
+    }
+
+    function resetBoard() {
+      document.querySelectorAll(".cell").forEach(cell => {
+        cell.textContent = "";
+      });
+      currentPlayer = "X";
+      gameActive = true;
+      document.getElementById("turnText").textContent = "Player X's Turn";
+    }
+  </script>
+</body>
+</html>
